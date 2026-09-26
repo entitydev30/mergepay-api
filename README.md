@@ -346,6 +346,16 @@ Retry budgets are exponential with jitter and fully configurable via env vars
 - `WORKER_ANCHOR_MAX_ATTEMPTS` (default 5), `WORKER_ANCHOR_RETRY_INITIAL_DELAY_MS`
   (default 5000), `WORKER_ANCHOR_RETRY_MAX_DELAY_MS` (default 120000),
   `WORKER_ANCHOR_RETRY_JITTER_RATIO` (default 0.25)
+- `WORKER_CYCLE_TASK_MAX_ATTEMPTS` (default 3), `WORKER_CYCLE_TASK_RETRY_INITIAL_DELAY_MS`
+  (default 500), `WORKER_CYCLE_TASK_RETRY_MAX_DELAY_MS` (default 10000) — retries
+  for the *cycle tasks* themselves (issue #708). A sweep that throws a transient
+  database or Horizon error is retried in-cycle with exponential backoff;
+  permanent and indeterminate failures are left to the next cycle. A task whose
+  budget is exhausted is dead-lettered as a critical log line for that cycle
+  while its sibling tasks continue.
+- `WORKER_HEALTH_UNHEALTHY_THRESHOLD` (default 3) — consecutive failed cycles
+  before the per-cycle `worker_health` heartbeat reports `healthy: false` and a
+  critical health line is emitted.
 
 ## How it works
 
