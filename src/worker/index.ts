@@ -52,6 +52,7 @@ import {
 import { pollForConfirmation } from "../services/horizon-confirm";
 import { settlementPaymentIntent } from "../services/settlement-xdr";
 import { checkSettlementPreflight } from "../services/settlement-preflight";
+import { recordStatusTransitionInTransaction } from "../services/status-history";
 import {
   classifySettlementFailure,
   type SettlementFailureCategory,
@@ -203,24 +204,32 @@ async function scheduleRetry(params: {
   const nextAttemptAt = new Date(Date.now() + delayMs);
   const leaseExpiresAt = new Date(nextAttemptAt.getTime() + config.WORKER_LEASE_TIMEOUT_MS);
 
-  await prisma.settlement.update({
-    where: { id: job.id },
-    data: {
-      retryCount: attempt,
-      nextAttemptAt,
-      errorCategory: category,
-      failureReason: reason,
-      leaseExpiresAt,
-    },
-  });
+  // The retry bookkeeping, the status-history entry, and the backoff decision
+  // describe one retry event; persist them in a single interactive transaction
+  // so a crash (or a database hiccup) between the writes can never leave a row
+  // whose retryCount, failure reason, and history disagree. A failure anywhere
+  // rolls both writes back and propagates: the worker's batch loop releases
+  // the lease and the next cycle re-claims the job from a consistent state.
+  await prisma.$transaction(async (tx) => {
+    await tx.settlement.update({
+      where: { id: job.id },
+      data: {
+        retryCount: attempt,
+        nextAttemptAt,
+        errorCategory: category,
+        failureReason: reason,
+        leaseExpiresAt,
+      },
+    });
 
-  await recordStatusTransition({
-    entityType: "settlement",
-    entityId: job.id,
-    newStatus: job.status,
-    reason,
-    source: "worker",
-  }).catch(() => undefined);
+    await recordStatusTransitionInTransaction(tx as never, {
+      entityType: "settlement",
+      entityId: job.id,
+      newStatus: job.status,
+      reason,
+      source: "worker",
+    });
+  });
 
   loggerWithContext(log, ctx).warn(
     {
@@ -363,6 +372,10 @@ async function confirmSubmission(params: {
     nextAttemptAt: null,
   });
 
+  // Best-effort, like `audit` everywhere outside a caller-owned transaction:
+  // the transition above already committed with its own atomic audit record,
+  // so this informational line must never turn a *completed* submission into
+  // a failed job.
   await audit({
     userId: null,
     groupId: job.groupId,
