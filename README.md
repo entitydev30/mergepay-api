@@ -140,6 +140,39 @@ To add the local development seed data, run:
 npm run db:seed
 ```
 
+### Seed data
+
+`npm run db:seed` runs [prisma/seed.ts](prisma/seed.ts) and populates a
+disposable demo dataset so API endpoints can be exercised immediately, without
+manual bootstrapping. The script is **idempotent**: every row is written with
+an upsert keyed by a deterministic id (or another natural unique key), so
+running it again never throws a unique constraint violation and never
+duplicates data. A re-run also restores any seed-owned row to its canonical
+demo values. Rows left behind by older versions of the seed (random ids) are
+untouched — delete them by hand if you want a clean slate.
+
+| Row | Details |
+| --- | --- |
+| Users | `Ada`, `Kola`, `Zo`, `Tunde` — deterministic testnet keypairs |
+| Groups | `Lagos Trip` (4 members) and `Flat 12B` (3 members, treasury enabled) |
+| Expenses | `Dinner` (equal), `Airport transfer` (equal), `Groceries` (custom split), `Wi-Fi subscription` (equal) |
+| Settlements | `SEEDSETTLE` confirmed, `SEEDQUEUE2` pending signature, `SEEDRETRY2` failed and retryable — each with status history |
+| Treasury | confirmed deposit `SEEDTREASR` (100 XLM) and pending deposit `SEEDGRANT2` (50 XLM) in `Flat 12B` |
+| Invite | code `SEEDCLUB` for `Lagos Trip` (max 10 uses) |
+
+The demo accounts are derived from public labels (`mergepay:demo:…`), so their
+secret keys are recomputable by anyone: use them only in local or testnet
+databases and never fund them with anything of value. To sign demo
+transactions (for example in Stellar Laboratory), print the secret seeds with:
+
+```bash
+SEED_PRINT_SECRETS=1 npm run db:seed
+```
+
+Seeded intents carry `expiresAt = null`, which the API reads as "no recorded
+deadline", so demo rows stay actionable instead of expiring while the database
+sits idle.
+
 New to the codebase? The typing standards enforced across `src/` are documented in [TypeScript strict mode](#typescript-strict-mode).
 
 ## Environment variables
