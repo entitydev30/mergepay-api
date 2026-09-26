@@ -481,14 +481,19 @@ describe("route integration — POST /groups emits a structured audit event", ()
     const { logger, lines } = captureLogger();
     setAuditEventLogger(logger);
 
+    // The unknown `token` key is rejected by the strict role schema (#707),
+    // so the sanitization property is exercised on the removal payload below
+    // and on this request's headers instead of an accepted body.
     const res = await app.inject({
       method: "POST",
       url: "/groups/group_1/members/role",
-      headers: authHeader(),
+      headers: {
+        ...authHeader(),
+        "x-sentinel": "audit-test-token-must-not-appear",
+      },
       payload: {
         userId: targetUserId,
         role: "admin",
-        token: "audit-test-token-must-not-appear",
       },
     });
 

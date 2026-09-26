@@ -408,6 +408,7 @@ const GROUP_ROUTES: GroupRoute[] = [
   // src/routes/groups.ts
   { method: "GET", path: "/groups/:id/balance", role: "member" },
   { method: "GET", path: "/groups/:id", role: "member" },
+  { method: "PATCH", path: "/groups/:id", role: "admin" },
   { method: "POST", path: "/groups/:id/invite", role: "admin" },
   { method: "POST", path: "/groups/:id/leave", role: "member" },
   { method: "PATCH", path: "/groups/:id/members/:memberId", role: "admin" },
