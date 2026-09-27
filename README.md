@@ -190,10 +190,32 @@ See [.env.example](.env.example). Key ones:
 | `STELLAR_NETWORK` | `testnet` or `public` |
 | `HORIZON_URL` | Horizon server |
 | `SEP10_SIGNING_SECRET` | Server's SEP-10 signing key (`npm run gen:sep10key`) |
-| `WEB_URL` | Frontend origin (CORS + invite links) |
+| `WEB_URL` | Frontend origin allow-list for CORS + invite links (comma-separated; `*` for local dev) |
 | `ANCHOR_HOME_DOMAIN` | SEP-24 anchor home domain (default SDF test anchor) |
 | `ANCHOR_WEBHOOK_SECRET` | Shared secret for the anchor webhook |
 | `STABLE_ASSET_CODE` / `STABLE_ASSET_ISSUER` | Stable asset for settlement |
+
+#### CORS configuration
+
+Cross-origin access for the frontend (`mergepay-web`) is configured entirely
+from the environment: `src/app.ts` registers `@fastify/cors` with the options
+built by `src/lib/cors.ts`. Preflights are answered `204` inside the plugin's
+`onRequest` hook — ahead of authentication and rate limiting — because a
+browser never sends an `Authorization` header on an `OPTIONS` probe.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `WEB_URL` | `""` (deny cross-origin) | Origin allow-list, comma-separated; `*` reflects any origin and is for local development only (the shipped `.env.example` sets `*`) |
+| `CORS_ALLOW_CREDENTIALS` | `false` | Whether cross-origin requests may carry credentials; never enable alongside `WEB_URL=*` outside local development |
+| `CORS_ALLOW_METHODS` | `GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS` | Methods advertised on a preflight — restricted to this list, never echoed from the request |
+| `CORS_ALLOW_HEADERS` | `Content-Type,Authorization,X-Requested-With,Idempotency-Key` | Request headers a cross-origin request may send |
+| `CORS_EXPOSE_HEADERS` | `X-Request-ID,X-Correlation-ID,X-RateLimit-*`,`Retry-After` | Response headers made readable to the caller |
+| `CORS_MAX_AGE` | `86400` | Preflight cache lifetime in seconds |
+
+An empty `WEB_URL` denies every cross-origin request while leaving same-origin
+and non-browser clients (no `Origin` header) to the routes' own
+authentication. If `WEB_URL` names a `*.vercel.app` host, preview deployments
+of the frontend (`mergepay-web-*.vercel.app`) are allowed too.
 
 #### Horizon read retries
 
