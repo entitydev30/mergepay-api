@@ -386,6 +386,18 @@ Retry budgets are exponential with jitter and fully configurable via env vars
 The wallet signs it; `POST /auth/verify` validates the signature (handling
 unfunded accounts via the master key), upserts the user, and returns a JWT.
 
+Challenge transactions carry a **strictly validated validity window**: the
+envelope's own `minTime`/`maxTime` are checked against server time with a
+bounded 30-second clock-skew tolerance. A challenge whose `maxTime` has elapsed
+is rejected with 401 `CHALLENGE_EXPIRED` (the remedy is to request and sign a
+fresh one); one whose `minTime` has not been reached returns
+`CHALLENGE_NOT_YET_VALID`, and a window longer than the 300s validity the
+server issues returns `CHALLENGE_WINDOW_TOO_LONG`. All other verification
+failures stay the generic 401 `UNAUTHORIZED`, so rejections cannot be probed
+for which structural check failed. Challenges are single-use (durable replay
+detection), and the worker's challenge cleanup purges replay records once
+their window closes, keeping them for 24h forensics before deletion.
+
 ### Settlement
 1. `POST /expenses/:id/settle` (or `POST /groups/:id/settlements`) builds an
    **unsigned** payment XDR — correct source, destination, asset, amount, and a
